@@ -12,8 +12,7 @@ repository contains the training infrastructure and related tools for MLGO.
 
 We currently use two different ML algorithms: Policy Gradient and Evolution
 Strategies to train policies. Currently, this repository only support Policy
-Gradient training. The release of Evolution Strategies training is on our
-roadmap.
+Gradient. The release of Evolution Strategies is on our roadmap.
 
 Check out this [demo](docs/demo/demo.md) for an end-to-end demonstration of how
 to train your own inlining-for-size policy from the scratch with Policy
