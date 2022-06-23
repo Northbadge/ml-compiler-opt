@@ -119,10 +119,11 @@ def train_eval(agent_name=constant.AgentName.PPO,
       time_step_spec=time_step_spec,
       action_spec=action_spec,
       batch_size=batch_size,
-      train_sequence_length=train_sequence_length)
+      train_sequence_length=train_sequence_length,
+      num_workers=FLAGS.num_workers)
 
-  def sequence_example_iterator_fn(seq_ex: List[str]):
-    return iter(dataset_fn(seq_ex).repeat())
+  def sequence_example_iterator_fn(seq_ex: List[bytes]):
+    return dataset_fn(seq_ex)
 
   reward_stat_map = collections.defaultdict(lambda: None)
   reward_stat_map_path = os.path.join(root_dir, 'reward_stat_map')

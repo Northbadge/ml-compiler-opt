@@ -15,6 +15,8 @@
 """LLVM Policy Trainer."""
 
 import time
+from typing import List
+from tf_agents.trajectories import trajectory
 
 from absl import logging
 
@@ -171,24 +173,25 @@ class Trainer(object):
   def global_step_numpy(self):
     return self._global_step.numpy()
 
-  def train(self, dataset_iter, monitor_dict, num_iterations):
+  def train(self, dataset: List[trajectory.Trajectory],
+            monitor_dict, num_iterations):
     """Trains policy with data from dataset_iter for num_iterations steps."""
     self._reset_metrics()
     # context management is implemented in decorator
     # pylint: disable=not-context-manager
+    # When the data is not enough to fill in a batch, an empty list will be
+    # passed in, we log a warning message instead of killing the training
+    # when it happens.
+    if not dataset:
+      logging.warning(
+        ('Warning: skip training because do not have enough data to fill '
+         'in a batch, consider increase data or reduce batch size.'))
+      return
+
     with tf.summary.record_if(
         lambda: tf.math.equal(self._global_step % self._summary_interval, 0)):
-      for _ in range(num_iterations):
-        # When the data is not enough to fill in a batch, next(dataset_iter)
-        # will throw StopIteration exception, logging a warning message instead
-        # of killing the training when it happens.
-        try:
-          experience = next(dataset_iter)
-        except StopIteration:
-          logging.warning(
-              ('Warning: skip training because do not have enough data to fill '
-               'in a batch, consider increase data or reduce batch size.'))
-          break
+      for i in range(num_iterations):
+        experience = dataset[i % len(dataset)]
 
         # random network distillation for intrinsic reward generation
         if self._random_network_distillation:

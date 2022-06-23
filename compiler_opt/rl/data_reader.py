@@ -81,7 +81,7 @@ def _process_parsed_sequence_and_get_policy_info(parsed_sequence, agent_name,
 
 def create_parser_fn(
     agent_name: constant.AgentName, time_step_spec: types.NestedSpec,
-    action_spec: types.NestedSpec) -> Callable[[str], trajectory.Trajectory]:
+    action_spec: types.NestedSpec) -> Callable[[bytes], trajectory.Trajectory]:
   """Create a parser function for reading from a serialized tf.SequenceExample.
 
   Args:
@@ -143,7 +143,8 @@ def create_parser_fn(
 def create_sequence_example_dataset_fn(
     agent_name: constant.AgentName, time_step_spec: types.NestedSpec,
     action_spec: types.NestedSpec, batch_size: int,
-    train_sequence_length: int) -> Callable[[List[str]], tf.data.Dataset]:
+    train_sequence_length: int, num_workers: int
+    )-> Callable[[List[bytes]], List[trajectory.Trajectory]]:
   """Get a function that creates a dataset from serialized sequence examples.
 
   Args:
@@ -163,18 +164,28 @@ def create_sequence_example_dataset_fn(
   parser_fn = create_parser_fn(agent_name, time_step_spec, action_spec)
 
   def _sequence_example_dataset_fn(sequence_examples):
-    # Data collector returns empty strings for corner cases, filter them out
-    # here.
-    dataset = tf.data.Dataset.from_tensor_slices(sequence_examples).filter(
-        lambda string: tf.strings.length(string) > 0).map(parser_fn).filter(
-            lambda traj: tf.size(traj.reward) > 2)
-    dataset = (
-        dataset.unbatch().batch(
-            train_sequence_length,
-            drop_remainder=True).shuffle(trajectory_shuffle_buffer_size).batch(
-                batch_size,
-                drop_remainder=True).prefetch(tf.data.experimental.AUTOTUNE))
-    return dataset
+    num_examples = len(sequence_examples)
+    dataset = tf.data.Dataset.from_tensor_slices(sequence_examples)
+
+    # Shard the dataset to enable parallel unbatching via interleaving
+    def shard_ds(idx):
+      # Data collector returns empty strings for corner cases, filter them out
+      # here.
+      return (dataset.shard(num_examples, idx)
+              .filter(lambda string: tf.strings.length(string) > 0)
+              .map(parser_fn, num_parallel_calls=1)
+              .filter(lambda traj: tf.size(traj.reward) > 2)
+              .unbatch()
+              )
+
+    indices = tf.data.Dataset.range(num_examples)
+    dataset = indices.interleave(shard_ds, num_parallel_calls=num_workers, deterministic=False)
+
+    dataset = (dataset.shuffle(trajectory_shuffle_buffer_size * train_sequence_length)
+               .batch(train_sequence_length, drop_remainder=True, num_parallel_calls=num_workers, deterministic=False)
+               .batch(batch_size, drop_remainder=True, num_parallel_calls=num_workers, deterministic=False)
+               )
+    return list(dataset)
 
   return _sequence_example_dataset_fn
 
@@ -236,7 +247,7 @@ def create_file_dataset_fn(
 def create_tfrecord_dataset_fn(
     agent_name: constant.AgentName, time_step_spec: types.NestedSpec,
     action_spec: types.NestedSpec, batch_size: int,
-    train_sequence_length: int) -> Callable[[List[str]], tf.data.Dataset]:
+    train_sequence_length: int) -> Callable[[List[bytes]], tf.data.Dataset]:
   """Get a function that creates an dataset from tfrecord.
 
   Args:
