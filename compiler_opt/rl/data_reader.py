@@ -14,6 +14,7 @@
 # limitations under the License.
 """util function to create training datasets."""
 
+import itertools
 from typing import Callable, List
 
 import tensorflow as tf
@@ -139,7 +140,7 @@ def create_parser_fn(
 
   return _parser_fn
 
-
+gbl_traj = None
 def create_sequence_example_dataset_fn(
     agent_name: constant.AgentName, time_step_spec: types.NestedSpec,
     action_spec: types.NestedSpec, batch_size: int,
@@ -178,14 +179,27 @@ def create_sequence_example_dataset_fn(
               .unbatch()
               )
 
-    indices = tf.data.Dataset.range(num_examples)
-    dataset = indices.interleave(shard_ds, num_parallel_calls=num_workers, deterministic=False)
-
-    dataset = (dataset.shuffle(trajectory_shuffle_buffer_size * train_sequence_length)
+    # indices = tf.data.Dataset.range(num_examples)
+    # dataset = indices.interleave(shard_ds, num_parallel_calls=num_workers, deterministic=False)
+    dataset = (dataset.filter(lambda string: tf.strings.length(string) > 0)
+              .map(parser_fn, num_parallel_calls=1)
+              .filter(lambda traj: tf.size(traj.reward) > 2)
+              .unbatch()
+              )
+    ds1 = (dataset.batch(train_sequence_length, drop_remainder=True, num_parallel_calls=num_workers, deterministic=False)
+            .shuffle(trajectory_shuffle_buffer_size)
+            .batch(batch_size, drop_remainder=True, num_parallel_calls=num_workers, deterministic=False)
+          )
+    ds2 = list(ds1)
+    global gbl_traj
+    if gbl_traj is None:
+      gbl_traj = ds2[0]
+    ds3 = list(dataset.shuffle(trajectory_shuffle_buffer_size * train_sequence_length)
                .batch(train_sequence_length, drop_remainder=True, num_parallel_calls=num_workers, deterministic=False)
                .batch(batch_size, drop_remainder=True, num_parallel_calls=num_workers, deterministic=False)
                )
-    return list(dataset)
+    # return (list(itertools.islice(iter(ds1.repeat()), 300)), ds2, ds3)
+    return ([gbl_traj], ds2, ds3)
 
   return _sequence_example_dataset_fn
 

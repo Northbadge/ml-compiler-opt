@@ -149,11 +149,31 @@ class TrainingIRExtractor:
         self.input_obj(), '/dev/null'
     ]
 
+  def _compile_ir(self, llvm_objcopy_path):
+    """Call llc to compile ir files so we can objcopy"""
+    with open(self.input_obj(), "rb") as f:
+      magic = f.read(2)
+    if magic == b"BC":
+      logging.info('%s is an IR file, codegenning it', self.input_obj())
+      bc_path = self.input_obj()
+      self._obj_relative_path += ".native"
+      native_path = self.input_obj()
+      subprocess.run(
+        # [llvm_objcopy_path.replace('llvm-objcopy', 'llc'), '-filetype=obj', '-o', native_path, bc_path], check=True)
+        [llvm_objcopy_path.replace('llvm-objcopy', 'clang'), '-x', 'ir', bc_path, '-o', native_path, '-c'], check=True)
+
+    return
+
   def extract(self, llvm_objcopy_path: str, cmd_filter: str,
               is_thinlto: bool) -> str:
     """Run llvm-objcopy to extract the .bc and command line."""
     if not os.path.exists(self.input_obj()):
       logging.info('%s does not exist.', self.input_obj())
+      return None
+    try:
+      self._compile_ir(llvm_objcopy_path)
+    except Exception as e:
+      logging.warning('%s was not processed due to ir compile: %s', self.input_obj(), e)
       return None
     os.makedirs(self.dest_dir(), exist_ok=True)
     try:
@@ -192,7 +212,12 @@ def convert_compile_command_to_objectfile(command: Dict[str, str],
   cmd = command['command']
 
   cmd_parts = cmd.split()
-  obj_index = cmd_parts.index('-o') + 1
+  try:
+    obj_index = cmd_parts.index('-o') + 1
+  except Exception:
+    print(cmd)
+    return None
+
   obj_rel_path = cmd_parts[obj_index]
   # TODO(mtrofin): is the obj_base_dir correct for thinlto index bc files?
   return TrainingIRExtractor(
@@ -236,6 +261,8 @@ def load_from_lld_params(params_array: List[str], obj_base_dir: str,
 # This is here just for readability, lint complains if the pooling expression is
 # over 3 lines; and it needs to be a non-local so it may be pickled.
 def extract_artifacts(obj: TrainingIRExtractor) -> str:
+  if obj is None:
+    return None
   return obj.extract(FLAGS.llvm_objcopy_path, FLAGS.cmd_filter,
                      FLAGS.thinlto_build)
 

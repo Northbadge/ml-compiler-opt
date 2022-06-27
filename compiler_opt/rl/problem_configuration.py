@@ -98,3 +98,6 @@ class ProblemConfiguration(metaclass=abc.ABCMeta):
 
 def is_thinlto(module_paths: Iterable[str]) -> bool:
   return tf.io.gfile.exists(next(iter(module_paths)) + '.thinlto.bc')
+
+def has_cmd(module_paths: Iterable[str]) -> bool:
+  return tf.io.gfile.exists(next(iter(module_paths)) + '.cmd')

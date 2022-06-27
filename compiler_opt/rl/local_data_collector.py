@@ -85,7 +85,7 @@ class LocalDataCollector(data_collector.DataCollector):
     self._join_pending_jobs()
     cancellation_token = compilation_runner.ProcessCancellationToken()
     jobs = [(file_paths, policy_path,
-             self._reward_stat_map['-'.join(file_paths)], cancellation_token)
+             self._reward_stat_map['-'.join(f for f in file_paths if f is not None)], cancellation_token)
             for file_paths in sampled_file_paths]
 
     # Make sure we're not missing failures in workers. All but
@@ -149,7 +149,7 @@ class LocalDataCollector(data_collector.DataCollector):
     total_trajectory_length = sum(
         res.get().length for (_, res) in successful_work)
     self._reward_stat_map.update({
-        '-'.join(file_paths): res.get().reward_stats
+        '-'.join(f for f in file_paths if f is not None): res.get().reward_stats
         for (file_paths, res) in successful_work
     })
 
@@ -164,9 +164,9 @@ class LocalDataCollector(data_collector.DataCollector):
     monitor_dict[
         'reward_distribution'] = data_collector.build_distribution_monitor(
             rewards)
-
+    a = time.time()
     parsed = self._parser(sequence_examples)
-
+    logging.info(f'parser: {time.time() - a:f}')
     self._pending_work = [res for res in results if not res.ready()]
     # if some of the cancelled work hasn't yet processed the signal, let's let
     # it do that while we process the data. We also need to hold on to the

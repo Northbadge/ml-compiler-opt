@@ -77,9 +77,8 @@ class Trainer(object):
 
     self._summary_writer = tf.summary.create_file_writer(
         self._root_dir, flush_millis=summaries_flush_secs * 1000)
-    self._summary_writer.set_as_default()
 
-    self._global_step = tf.compat.v1.train.get_or_create_global_step()
+    self._global_step = tf.Variable(0, dtype=tf.int64)
 
     # Initialize agent and trajectory replay.
     # Wrap training and trajectory replay in a tf.function to make it much
@@ -155,7 +154,7 @@ class Trainer(object):
 
   def _log_experiment(self, loss):
     """Log training info."""
-    global_step_val = self._global_step.numpy()
+    global_step_val = self.global_step_numpy()
     if global_step_val - self._last_log_step >= self._log_interval:
       logging.info('step = %d, loss = %g', global_step_val, loss)
       time_acc = time.time() - self._start_time
@@ -165,10 +164,10 @@ class Trainer(object):
       self._start_time = time.time()
 
   def _save_checkpoint(self):
-    if (self._global_step.numpy() - self._last_checkpoint_step >=
+    if (self.global_step_numpy() - self._last_checkpoint_step >=
         self._checkpoint_interval):
       self._checkpointer.save(global_step=self._global_step)
-      self._last_checkpoint_step = self._global_step.numpy()
+      self._last_checkpoint_step = self.global_step_numpy()
 
   def global_step_numpy(self):
     return self._global_step.numpy()
@@ -176,29 +175,37 @@ class Trainer(object):
   def train(self, dataset: List[trajectory.Trajectory],
             monitor_dict, num_iterations):
     """Trains policy with data from dataset_iter for num_iterations steps."""
-    self._reset_metrics()
-    # context management is implemented in decorator
-    # pylint: disable=not-context-manager
-    # When the data is not enough to fill in a batch, an empty list will be
-    # passed in, we log a warning message instead of killing the training
-    # when it happens.
-    if not dataset:
-      logging.warning(
-        ('Warning: skip training because do not have enough data to fill '
-         'in a batch, consider increase data or reduce batch size.'))
-      return
+    with self._summary_writer.as_default():
+      self._reset_metrics()
+      # context management is implemented in decorator
+      # pylint: disable=not-context-manager
+      # When the data is not enough to fill in a batch, an empty list will be
+      # passed in, we log a warning message instead of killing the training
+      # when it happens.
+      if not dataset:
+        logging.warning(
+          ('Warning: skip training because do not have enough data to fill '
+          'in a batch, consider increase data or reduce batch size.'))
+        return
+      a = time.time()
+      with tf.summary.record_if(
+          lambda: tf.math.equal(self._global_step % self._summary_interval, 0)):
+        for i in range(num_iterations):
+          if type(dataset) == list:
+            experience = dataset[i % len(dataset)]
+          else:
+            try:
+              experience = next(iter)
+            except Exception as e:
+              return
+          self._global_step.count_up_to(100000000000)
+          # random network distillation for intrinsic reward generation
+          if self._random_network_distillation:
+            experience = self._random_network_distillation.train(experience)
 
-    with tf.summary.record_if(
-        lambda: tf.math.equal(self._global_step % self._summary_interval, 0)):
-      for i in range(num_iterations):
-        experience = dataset[i % len(dataset)]
+          loss = self._agent.train(experience)
 
-        # random network distillation for intrinsic reward generation
-        if self._random_network_distillation:
-          experience = self._random_network_distillation.train(experience)
-
-        loss = self._agent.train(experience)
-
-        self._update_metrics(experience, monitor_dict)
-        self._log_experiment(loss.loss)
-        self._save_checkpoint()
+          self._update_metrics(experience, monitor_dict)
+          self._log_experiment(loss.loss)
+          self._save_checkpoint()
+        logging.info(f'{self._root_dir:s}: {time.time() - a:f}')

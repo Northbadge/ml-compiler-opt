@@ -18,6 +18,7 @@ import io
 import os
 import tempfile
 from typing import Dict, Optional, Tuple
+import logging
 
 import gin
 import tensorflow as tf
@@ -75,7 +76,13 @@ class InliningRunner(compilation_runner.CompilationRunner):
     log_path = os.path.join(working_dir, 'log')
     output_native_path = os.path.join(working_dir, 'native')
 
-    input_ir_path, cmd_path = file_paths
+    thinlto_index_path = None
+    if len(file_paths) == 3:
+      input_ir_path, cmd_path, thinlto_index_path = file_paths
+    elif len(file_paths) == 2:
+      input_ir_path, cmd_path = file_paths
+    else:
+      logging.fatal('Expected 2 or 3 file paths')
 
     sequence_example = tf.train.SequenceExample()
     native_size = 0
@@ -83,19 +90,22 @@ class InliningRunner(compilation_runner.CompilationRunner):
       command_line = []
       if self._launcher_path:
         command_line.append(self._launcher_path)
-      command_line.extend([self._clang_path] +
+      command_line.extend([self._clang_path, '-cc1'] +
                           compilation_runner.get_command_line_for_bundle(
-                              cmd_path, input_ir_path) + [
+                              cmd_path, input_ir_path, thinlto_index_path) + [
                                   '-mllvm', '-enable-ml-inliner=development',
                                   '-mllvm', '-training-log=' +
                                   log_path, '-o', output_native_path
-                              ])
+                              ] +
+                              ([] if not thinlto_index_path else
+                              ['-mllvm', '-thinlto-assume-merged', '-c', '-v']))
       if tf_policy_path:
         command_line.extend(
             ['-mllvm', '-ml-inliner-model-under-training=' + tf_policy_path])
+      # logging.info(' '.join(command_line))
       compilation_runner.start_cancellable_process(command_line,
                                                    self._compilation_timeout,
-                                                   cancellation_manager)
+                                                   cancellation_manager, want_err=False)
       command_line = [self._llvm_size_path, output_native_path]
       output_bytes = compilation_runner.start_cancellable_process(
           command_line,

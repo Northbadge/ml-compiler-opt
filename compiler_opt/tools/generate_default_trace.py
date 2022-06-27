@@ -136,8 +136,10 @@ def main(_):
         os.path.join(_DATA_PATH.value, name.rstrip('\n')) for name in f
     ]
   is_thinlto = problem_configuration.is_thinlto(module_paths)
-  file_suffix = ('.bc', '.cmd', '.thinlto.bc') if is_thinlto else ('.bc',
-                                                                   '.cmd')
+  has_cmd = problem_configuration.has_cmd(module_paths)
+
+  file_suffix = ('.bc', '.cmd' if has_cmd else None, '.thinlto.bc' if is_thinlto else None)
+
   if _MODULE_FILTER.value:
     m = re.compile(_MODULE_FILTER.value)
     module_paths = [mp for mp in module_paths if m.match(mp)]
@@ -153,7 +155,7 @@ def main(_):
   sizes_and_paths.sort(reverse=True)
   sorted_module_paths = [p for _, p in sizes_and_paths]
   module_specs = [
-      tuple(p + suffix for suffix in file_suffix) for p in sorted_module_paths
+      tuple(p + suffix if suffix else None for suffix in file_suffix) for p in sorted_module_paths
   ]
 
   worker_count = (

@@ -77,7 +77,7 @@ def _overwrite_trajectory_reward(sequence_example: tf.train.SequenceExample,
 
 def get_command_line_for_bundle(cmd_file: str,
                                 ir_file: str,
-                                thinlto: Optional[str] = None) -> List[str]:
+                                thinlto_path: Optional[str] = None) -> List[str]:
   """Cleans up base command line.
 
   Remove certain unnecessary flags, and add the .bc file to compile and, if
@@ -97,19 +97,37 @@ def get_command_line_for_bundle(cmd_file: str,
       '-fprofile-sample-use'
   ]
 
-  with open(cmd_file, encoding='utf-8') as f:
-    option_iterator = iter(f.read().split('\0'))
+  if cmd_file:
+    with open(cmd_file, encoding='utf-8') as f:
+      opts = f.read().split('\0')
+      # print(opts)
+      option_iterator = iter(opts)
+  else:
+    option_iterator = iter([
+      '-fPIC',
+      '-mllvm', '-instcombine-lower-dbg-declare=0',
+      '-mllvm','-import-instr-limit=5',
+      '-march=armv7-a',
+      '--unwindlib=none',
+      '--target=arm-linux-androideabi23',
+      '-no-canonical-prefixes',
+      '-O2',
+      '-nostdlib++',
+      '-fuse-ld=lld',
+      '--sysroot=/usr/local/google/home/njx/ck/src/third_party/android_ndk/toolchains/llvm/prebuilt/linux-x86_64/sysroot',
+    ])
+
+  option = next(option_iterator, None)
+  while option:
+    if any(option.startswith(flag) for flag in flags_to_remove):
+      if '=' not in option:
+        next(option_iterator, None)
+    else:
+      cmdline.append(option)
     option = next(option_iterator, None)
-    while option:
-      if any(option.startswith(flag) for flag in flags_to_remove):
-        if '=' not in option:
-          next(option_iterator, None)
-      else:
-        cmdline.append(option)
-      option = next(option_iterator, None)
   cmdline.extend(['-x', 'ir', ir_file])
-  if thinlto:
-    cmdline.append('-fthinlto-index=' + thinlto)
+  if thinlto_path:
+    cmdline.append('-fthinlto-index=' + thinlto_path)
   return cmdline
 
 
@@ -182,7 +200,8 @@ def start_cancellable_process(
     cmdline: List[str],
     timeout: float,
     cancellation_manager: Optional[WorkerCancellationManager],
-    want_output: bool = False) -> Optional[bytes]:
+    want_output: bool = False,
+    want_err = True) -> Optional[bytes]:
   """Start a cancellable process.
 
   Args:
@@ -199,7 +218,7 @@ def start_cancellable_process(
     ProcessKilledError: if the process was killed via the cancellation token.
   """
   with subprocess.Popen(
-      cmdline, stdout=(subprocess.PIPE if want_output else None)) as p:
+      cmdline, stdout=(subprocess.PIPE if want_output else None), stderr=(subprocess.DEVNULL if not want_err else None)) as p:
     if cancellation_manager:
       cancellation_manager.register_process(p)
 
