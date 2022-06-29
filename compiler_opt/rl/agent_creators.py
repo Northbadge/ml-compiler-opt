@@ -78,7 +78,8 @@ def _create_ppo_agent(time_step_spec: types.NestedTensorSpec,
       time_step_spec,
       action_spec,
       actor_net=actor_network,
-      value_net=critic_network)
+      value_net=critic_network,
+      optimizer=tf.keras.optimizers.Adam(epsilon=0.0003125, learning_rate=0.00003))
 
 
 @gin.configurable

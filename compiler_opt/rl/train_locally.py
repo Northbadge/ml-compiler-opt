@@ -75,15 +75,15 @@ def train_eval(agent_name=constant.AgentName.PPO,
   preprocessing_layer_creator = problem_config.get_preprocessing_layer_creator()
 
   # Initialize trainer and policy saver.
-  tf_agent1 = agent_creators.create_agent(agent_name, time_step_spec,
-                                         action_spec,
-                                         preprocessing_layer_creator)
+  # tf_agent1 = agent_creators.create_agent(agent_name, time_step_spec,
+  #                                        action_spec,
+  #                                        preprocessing_layer_creator)
   tf_agent2 = agent_creators.create_agent(agent_name, time_step_spec,
   action_spec,
   preprocessing_layer_creator)
-  tf_agent3 = agent_creators.create_agent(agent_name, time_step_spec,
-  action_spec,
-  preprocessing_layer_creator)
+  # tf_agent3 = agent_creators.create_agent(agent_name, time_step_spec,
+  # action_spec,
+  # preprocessing_layer_creator)
   # create the random network distillation object
   random_network_distillation = None
   if use_random_network_distillation:
@@ -96,11 +96,11 @@ def train_eval(agent_name=constant.AgentName.PPO,
   root_dir2 = root_dir + 'mod'
   root_dir3 = root_dir + 'modshfl'
 
-  llvm_trainer1 = trainer.Trainer(
-      root_dir=root_dir1,
-      agent=tf_agent1,
-      random_network_distillation=random_network_distillation,
-      warmstart_policy_dir=warmstart_policy_dir)
+  # llvm_trainer1 = trainer.Trainer(
+  #     root_dir=root_dir1,
+  #     agent=tf_agent1,
+  #     random_network_distillation=random_network_distillation,
+  #     warmstart_policy_dir=warmstart_policy_dir)
 
   llvm_trainer2 = trainer.Trainer(
       root_dir=root_dir2,
@@ -108,27 +108,27 @@ def train_eval(agent_name=constant.AgentName.PPO,
       random_network_distillation=random_network_distillation,
       warmstart_policy_dir=warmstart_policy_dir)
 
-  llvm_trainer3 = trainer.Trainer(
-      root_dir=root_dir3,
-      agent=tf_agent3,
-      random_network_distillation=random_network_distillation,
-      warmstart_policy_dir=warmstart_policy_dir)
+  # llvm_trainer3 = trainer.Trainer(
+  #     root_dir=root_dir3,
+  #     agent=tf_agent3,
+  #     random_network_distillation=random_network_distillation,
+  #     warmstart_policy_dir=warmstart_policy_dir)
 
-  policy_dict1 = {
-      'saved_policy': tf_agent1.policy,
-      'saved_collect_policy': tf_agent1.collect_policy,
-  }
+  # policy_dict1 = {
+  #     'saved_policy': tf_agent1.policy,
+  #     'saved_collect_policy': tf_agent1.collect_policy,
+  # }
   policy_dict2 = {
       'saved_policy': tf_agent2.policy,
       'saved_collect_policy': tf_agent2.collect_policy,
   }
-  policy_dict3 = {
-      'saved_policy': tf_agent3.policy,
-      'saved_collect_policy': tf_agent3.collect_policy,
-  }
-  saver1 = policy_saver.PolicySaver(policy_dict=policy_dict1)
+  # policy_dict3 = {
+  #     'saved_policy': tf_agent3.policy,
+  #     'saved_collect_policy': tf_agent3.collect_policy,
+  # }
+  # saver1 = policy_saver.PolicySaver(policy_dict=policy_dict1)
   saver2 = policy_saver.PolicySaver(policy_dict=policy_dict2)
-  saver3 = policy_saver.PolicySaver(policy_dict=policy_dict3)
+  # saver3 = policy_saver.PolicySaver(policy_dict=policy_dict3)
 
   with open(
       os.path.join(FLAGS.data_path, 'module_paths'), 'r',
@@ -156,14 +156,14 @@ def train_eval(agent_name=constant.AgentName.PPO,
     return dataset_fn(seq_ex)
 
   reward_stat_map = collections.defaultdict(lambda: None)
-  reward_stat_map_path1 = os.path.join(root_dir1, 'reward_stat_map')
+  # reward_stat_map_path1 = os.path.join(root_dir1, 'reward_stat_map')
   reward_stat_map_path2 = os.path.join(root_dir2, 'reward_stat_map')
-  reward_stat_map_path3 = os.path.join(root_dir3, 'reward_stat_map')
+  # reward_stat_map_path3 = os.path.join(root_dir3, 'reward_stat_map')
 
   # Reload reward_stat_map if exists.
   # reward_stat_map of defaultdict(str, {str: RewardStat})
-  if tf.io.gfile.exists(reward_stat_map_path1):
-    with tf.io.gfile.GFile(reward_stat_map_path1, 'r') as f:
+  if tf.io.gfile.exists(reward_stat_map_path2):
+    with tf.io.gfile.GFile(reward_stat_map_path2, 'r') as f:
       data = json.load(f)
     for k, v in data.items():
       if v:
@@ -184,45 +184,45 @@ def train_eval(agent_name=constant.AgentName.PPO,
 
   # Repeat for num_policy_iterations iterations.
   t1 = time.time()
-  while (llvm_trainer1.global_step_numpy() <
+  while (llvm_trainer2.global_step_numpy() <
          num_policy_iterations * num_iterations):
     t2 = time.time()
     logging.info('Last iteration took: %f', t2 - t1)
     t1 = t2
-    with tf.io.gfile.GFile(reward_stat_map_path1, 'w') as f:
-      json.dump(reward_stat_map, f, cls=compilation_runner.DataClassJSONEncoder)
+    # with tf.io.gfile.GFile(reward_stat_map_path1, 'w') as f:
+      # json.dump(reward_stat_map, f, cls=compilation_runner.DataClassJSONEncoder)
     with tf.io.gfile.GFile(reward_stat_map_path2, 'w') as f:
       json.dump(reward_stat_map, f, cls=compilation_runner.DataClassJSONEncoder)
-    with tf.io.gfile.GFile(reward_stat_map_path3, 'w') as f:
-      json.dump(reward_stat_map, f, cls=compilation_runner.DataClassJSONEncoder)
+    # with tf.io.gfile.GFile(reward_stat_map_path3, 'w') as f:
+      # json.dump(reward_stat_map, f, cls=compilation_runner.DataClassJSONEncoder)
 
-    policy_path1 = os.path.join(root_dir1, 'policy',
-                               str(llvm_trainer1.global_step_numpy()))
+    # policy_path1 = os.path.join(root_dir1, 'policy',
+                              #  str(llvm_trainer1.global_step_numpy()))
     policy_path2 = os.path.join(root_dir2, 'policy',
                                str(llvm_trainer2.global_step_numpy()))
-    policy_path3 = os.path.join(root_dir3, 'policy',
-                               str(llvm_trainer3.global_step_numpy()))
-    saver1.save(policy_path1)
+    # policy_path3 = os.path.join(root_dir3, 'policy',
+                              #  str(llvm_trainer3.global_step_numpy()))
+    # saver1.save(policy_path1)
     saver2.save(policy_path2)
-    saver3.save(policy_path3)
+    # saver3.save(policy_path3)
 
     dataset_iter, monitor_dict = data_collector.collect_data(
         policy_path=os.path.join(policy_path2, deploy_policy_name))
 
     ds1, ds2, ds3 = dataset_iter
-    tt2 = threading.Thread(target=train_proxy, args=(llvm_trainer2, ds2, monitor_dict, num_iterations))
-    tt3 = threading.Thread(target=train_proxy, args=(llvm_trainer3, ds3, monitor_dict, num_iterations))
-    tt2.start()
-    tt3.start()
-    llvm_trainer1.train(ds1, monitor_dict, num_iterations)
-    tt2.join()
-    tt3.join()
+    # tt2 = threading.Thread(target=train_proxy, args=(llvm_trainer2, ds2, monitor_dict, num_iterations))
+    # tt3 = threading.Thread(target=train_proxy, args=(llvm_trainer3, ds3, monitor_dict, num_iterations))
+    # tt2.start()
+    # tt3.start()
+    llvm_trainer2.train(ds2, monitor_dict, num_iterations)
+    # tt2.join()
+    # tt3.join()
     data_collector.on_dataset_consumed(dataset_iter)
 
   # Save final policy.
-  saver1.save(root_dir1)
+  # saver1.save(root_dir1)
   saver2.save(root_dir2)
-  saver3.save(root_dir3)
+  # saver3.save(root_dir3)
 
   # Wait for all the workers to finish.
   data_collector.close_pool()
