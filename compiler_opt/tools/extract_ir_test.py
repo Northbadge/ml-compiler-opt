@@ -32,9 +32,9 @@ class ExtractIrTest(absltest.TestCase):
         }, '/corpus/destination/path')
     self.assertEqual(obj.input_obj(), '/output/directory/lib/bar.o')
     self.assertEqual(obj.relative_output_path(), 'lib/bar.o')
-    self.assertEqual(obj.cmd_file(), '/corpus/destination/path/lib/bar.o.cmd')
-    self.assertEqual(obj.bc_file(), '/corpus/destination/path/lib/bar.o.bc')
-    self.assertEqual(obj.thinlto_index_file(),
+    self.assertEqual(obj.dest_cmd(), '/corpus/destination/path/lib/bar.o.cmd')
+    self.assertEqual(obj.dest_bc(), '/corpus/destination/path/lib/bar.o.bc')
+    self.assertEqual(obj.dest_thinlto(),
                      '/corpus/destination/path/lib/bar.o.thinlto.bc')
 
   def test_arr_conversion(self):
@@ -51,19 +51,19 @@ class ExtractIrTest(absltest.TestCase):
     self.assertLen(res, 2)
     self.assertEqual(res[0].input_obj(), '/output/directory/lib/bar.o')
     self.assertEqual(res[0].relative_output_path(), 'lib/bar.o')
-    self.assertEqual(res[0].cmd_file(),
+    self.assertEqual(res[0].dest_cmd(),
                      '/corpus/destination/path/lib/bar.o.cmd')
-    self.assertEqual(res[0].bc_file(), '/corpus/destination/path/lib/bar.o.bc')
-    self.assertEqual(res[0].thinlto_index_file(),
+    self.assertEqual(res[0].dest_bc(), '/corpus/destination/path/lib/bar.o.bc')
+    self.assertEqual(res[0].dest_thinlto(),
                      '/corpus/destination/path/lib/bar.o.thinlto.bc')
 
     self.assertEqual(res[1].input_obj(), '/output/directory/lib/other/baz.o')
     self.assertEqual(res[1].relative_output_path(), 'lib/other/baz.o')
-    self.assertEqual(res[1].cmd_file(),
+    self.assertEqual(res[1].dest_cmd(),
                      '/corpus/destination/path/lib/other/baz.o.cmd')
-    self.assertEqual(res[1].bc_file(),
+    self.assertEqual(res[1].dest_bc(),
                      '/corpus/destination/path/lib/other/baz.o.bc')
-    self.assertEqual(res[1].thinlto_index_file(),
+    self.assertEqual(res[1].dest_thinlto(),
                      '/corpus/destination/path/lib/other/baz.o.thinlto.bc')
 
   def test_command_extraction(self):
@@ -108,9 +108,8 @@ class ExtractIrTest(absltest.TestCase):
     self.assertLen(obj, 2)
     self.assertEqual(obj[0].input_obj(), '/some/path/lib/obj1.o')
     self.assertEqual(obj[0].relative_output_path(), 'lib/obj1.o')
-    self.assertEqual(obj[0].cmd_file(), '/tmp/out/lib/obj1.o.cmd')
-    self.assertEqual(obj[0].thinlto_index_file(),
-                     '/tmp/out/lib/obj1.o.thinlto.bc')
+    self.assertEqual(obj[0].dest_cmd(), '/tmp/out/lib/obj1.o.cmd')
+    self.assertEqual(obj[0].dest_thinlto(), '/tmp/out/lib/obj1.o.thinlto.bc')
     self.assertEqual(obj[1].input_obj(), '/some/path/lib/dir/obj2.o')
 
   def test_filtering(self):
