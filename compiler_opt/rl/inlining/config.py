@@ -32,6 +32,9 @@ def get_inlining_signature_spec():
           'caller_basic_block_count',
           'caller_conditionally_executed_blocks',
           'caller_users',
+          'global_caller_users',
+          'global_callee_users',
+          'progress',
           'callee_basic_block_count',
           'callee_conditionally_executed_blocks',
           'callee_users',
@@ -69,6 +72,11 @@ def get_inlining_signature_spec():
 
           # inlining_default is not used as feature in training.
           'inlining_default'))
+  observation_spec.update(
+      dict((key,
+            tensor_spec.BoundedTensorSpec(
+                dtype=tf.int64, shape=(), name=key, minimum=0, maximum=10))
+           for key in ('linkage',)))
   reward_spec = tf.TensorSpec(dtype=tf.float32, shape=(), name='reward')
   time_step_spec = time_step.time_step_spec(observation_spec, reward_spec)
   action_spec = tensor_spec.BoundedTensorSpec(
@@ -91,6 +99,9 @@ def get_observation_processing_layer_creator(quantile_file_dir=None,
     if obs_spec.name == 'inlining_default':
       return tf.keras.layers.Lambda(feature_ops.discard_fn)
 
+    if obs_spec.name == 'linkage':
+      return tf.keras.layers.Embedding(11, 6)
+
     quantile = quantile_map[obs_spec.name]
     return tf.keras.layers.Lambda(
         feature_ops.get_normalize_fn(quantile, with_sqrt,
@@ -100,4 +111,4 @@ def get_observation_processing_layer_creator(quantile_file_dir=None,
 
 
 def get_nonnormalized_features():
-  return ['reward', 'inlining_default', 'inlining_decision']
+  return ['reward', 'inlining_default', 'inlining_decision', 'linkage']
